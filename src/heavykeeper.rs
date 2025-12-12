@@ -75,7 +75,7 @@ pub enum BuilderError {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct TopK<T: Ord + Clone + Hash + Debug, H: BuildHasher + Clone = RandomState> {
+pub struct TopK<T: Ord + Clone + Hash + Debug, H: BuildHasher + Clone + Default = RandomState> {
     top_items: usize,
     width: usize,
     depth: usize,
@@ -129,7 +129,7 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T, RandomState> {
     }
 }
 
-impl<T: Ord + Clone + Hash + Debug, H: BuildHasher + Clone> TopK<T, H> {
+impl<T: Ord + Clone + Hash + Debug, H: BuildHasher + Clone + Default> TopK<T, H> {
     pub fn builder() -> Builder<T> {
         Builder::new()
     }

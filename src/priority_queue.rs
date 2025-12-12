@@ -11,7 +11,8 @@ use serde::{Serialize, Deserialize};
     feature = "serde",
     derive(Deserialize, Serialize)
 )]
-pub(crate) struct TopKQueue<T, H> {
+#[derive(PartialEq, Debug)]
+pub(crate) struct TopKQueue<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone + Default> {
     items: HashMap<T, (u64, usize), H>,  // item -> (count, heap_index)
     heap: Vec<(u64, usize, usize)>,  // (count, sequence, item_index)
     item_store: Vec<T>,  // Store actual items here
@@ -27,7 +28,7 @@ impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T, RandomState> {
     }
 }
 
-impl<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone> TopKQueue<T, H> {
+impl<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone + Default> TopKQueue<T, H> {
     pub(crate) fn with_capacity_and_hasher(capacity: usize, hasher: H) -> Self {
         Self {
             items: HashMap::with_capacity_and_hasher(capacity, hasher),
