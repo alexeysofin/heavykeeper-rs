@@ -25,7 +25,7 @@ rand = { version = "0.9.0", features = [ "small_rng" ] }
 ahash = { git = "https://github.com/alexeysofin/aHash.git", rev = "b917333a498311d193a8c2084e88dd18561b264f" }
 serde = { version = "1.0.117", optional = true }
 thiserror = "2.0.11"
-gxhash = { version = "3.5.0", optional = true, features = ["deterministic"] }
+gxhash = { git = "https://github.com/alexeysofin/gxhash.git", rev = "912f37c23159020417a9e86160f42625ed9211bd", optional = true }
 
 [profile.release]
 debug = true
@@ -46,5 +46,5 @@ name = "topk_list"
 harness = false
 
 [features]
-serde = ["ahash/serde", "serde/derive"]
+serde = ["ahash/serde", "gxhash/serde", "serde/derive"]
 

@@ -12,7 +12,7 @@ use serde::{Serialize, Deserialize};
     derive(Deserialize, Serialize)
 )]
 #[derive(PartialEq, Debug)]
-pub(crate) struct TopKQueue<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone + Default> {
+pub(crate) struct TopKQueue<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone + Default = RandomState> {
     items: HashMap<T, (u64, usize), H>,  // item -> (count, heap_index)
     heap: Vec<(u64, usize, usize)>,  // (count, sequence, item_index)
     item_store: Vec<T>,  // Store actual items here
