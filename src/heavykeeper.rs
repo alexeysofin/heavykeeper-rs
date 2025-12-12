@@ -2,7 +2,7 @@ use ahash::RandomState;
 use std::borrow::Borrow;
 use std::clone::Clone;
 use std::fmt::Debug;
-use std::hash::Hash;
+use std::hash::{Hash, BuildHasher};
 use rand::{SeedableRng, RngCore};
 use rand::rngs::SmallRng;
 use thiserror::Error;
@@ -69,15 +69,15 @@ pub enum BuilderError {
     MissingField { field: String },
 }
 
-pub struct TopK<T: Ord + Clone + Hash + Debug> {
+pub struct TopK<T: Ord + Clone + Hash + Debug, H: BuildHasher + Clone = RandomState> {
     top_items: usize,
     width: usize,
     depth: usize,
     decay: f64,
     decay_thresholds: Vec<u64>,
     buckets: Vec<Vec<Bucket>>,
-    priority_queue: TopKQueue<T>,
-    hasher: RandomState,
+    priority_queue: TopKQueue<T, H>,
+    hasher: H,
     random: Box<dyn RngCore + Send + Sync>,
 }
 
@@ -103,11 +103,7 @@ fn precompute_decay_thresholds(decay: f64, num_entries: usize) -> Vec<u64> {
     thresholds
 }
 
-impl<T: Ord + Clone + Hash + Debug> TopK<T> {
-    pub fn builder() -> Builder<T> {
-        Builder::new()
-    }
-
+impl<T: Ord + Clone + Hash + Debug> TopK<T, RandomState> {
     pub fn new(k: usize, width: usize, depth: usize, decay: f64) -> Self {
         // Use a consistent seed for default initialization
         let seed = 12345; // Arbitrary but fixed seed
@@ -119,12 +115,18 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         let hasher = RandomState::with_seeds(seed, seed, seed, seed);
         Self::with_hasher(k, width, depth, decay, hasher)
     }
+}
 
-    pub fn with_hasher(k: usize, width: usize, depth: usize, decay: f64, hasher: RandomState) -> Self {
+impl<T: Ord + Clone + Hash + Debug, H: BuildHasher + Clone> TopK<T, H> {
+    pub fn builder() -> Builder<T> {
+        Builder::new()
+    }
+
+    pub fn with_hasher(k: usize, width: usize, depth: usize, decay: f64, hasher: H) -> Self {
         Self::with_components(k, width, depth, decay, hasher, Box::new(SmallRng::seed_from_u64(0)))
     }
 
-    fn with_components(k: usize, width: usize, depth: usize, decay: f64, hasher: RandomState, rng: Box<dyn RngCore + Send + Sync>) -> Self {
+    fn with_components(k: usize, width: usize, depth: usize, decay: f64, hasher: H, rng: Box<dyn RngCore + Send + Sync>) -> Self {
         // Pre-allocate with capacity to avoid resizing
         let mut buckets = Vec::with_capacity(depth);
         for _ in 0..depth {
@@ -1297,6 +1299,36 @@ mod tests {
         // With correct scaling, item1 is fully decayed and replaced by item2.
         assert_eq!(topk.bucket_count(&item1), 0);
         assert_eq!(topk.bucket_count(&item2), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "gxhash")]
+    fn test_gxhash() {
+        let gxhash_builder = gxhash::GxBuildHasher::default();
+        let k = 2;
+        let width = 100;
+        let depth = 5;
+        let decay = 0.9;
+        let mut topk: TopK<Vec<u8>, _> = TopK::with_hasher(k, width, depth, decay, gxhash_builder);
+
+        let items = [
+            b"item1".to_vec(),
+            b"item2".to_vec(),
+            b"item3".to_vec(),
+            b"item4".to_vec(),
+        ];
+
+        // Add items with different frequencies
+        topk.add(&items[0], 1);
+        topk.add(&items[1], 1);
+        topk.add(&items[2], 2);
+        topk.add(&items[3], 5);
+
+        // Verify counts
+        assert_eq!(topk.count(&items[0]), 1, "Count should be 1");
+        assert_eq!(topk.count(&items[1]), 1, "Count should be 1");
+        assert_eq!(topk.count(&items[2]), 2, "Count should be 2");
+        assert_eq!(topk.count(&items[3]), 5, "Count should be 5");
     }
 }
 

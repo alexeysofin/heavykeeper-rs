@@ -1,11 +1,11 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::hash::Hash;
+use std::hash::{BuildHasher, Hash};
 use ahash::RandomState;
 
 /// A specialized priority queue for HeavyKeeper that maintains top-k items by count
-pub(crate) struct TopKQueue<T> {
-    items: HashMap<T, (u64, usize), RandomState>,  // item -> (count, heap_index)
+pub(crate) struct TopKQueue<T, H> {
+    items: HashMap<T, (u64, usize), H>,  // item -> (count, heap_index)
     heap: Vec<(u64, usize, usize)>,  // (count, sequence, item_index)
     item_store: Vec<T>,  // Store actual items here
     free_slots: Vec<usize>,  // Track free slots in item_store
@@ -13,8 +13,15 @@ pub(crate) struct TopKQueue<T> {
     sequence: usize,
 }
 
-impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T> {
-    pub(crate) fn with_capacity_and_hasher(capacity: usize, hasher: RandomState) -> Self {
+impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T, RandomState> {
+    #[allow(dead_code)]
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
+        Self::with_capacity_and_hasher(capacity, RandomState::new())
+    }
+}
+
+impl<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone> TopKQueue<T, H> {
+    pub(crate) fn with_capacity_and_hasher(capacity: usize, hasher: H) -> Self {
         Self {
             items: HashMap::with_capacity_and_hasher(capacity, hasher),
             heap: Vec::with_capacity(capacity + 1),
@@ -23,11 +30,6 @@ impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T> {
             capacity,
             sequence: 0,
         }
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn with_capacity(capacity: usize) -> Self {
-        Self::with_capacity_and_hasher(capacity, RandomState::new())
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -310,7 +312,7 @@ mod tests {
         
         // Verify heap property: parent should be <= children for min-heap
         for i in 1..queue.heap.len() {
-            let parent_idx = TopKQueue::<String>::parent(i);
+            let parent_idx = TopKQueue::<String, RandomState>::parent(i);
             if parent_idx > 0 {  // Skip root's parent
                 assert!(queue.heap[parent_idx].0 <= queue.heap[i].0, 
                     "Heap property violated: parent count {} at index {} is greater than child count {} at index {}", 
