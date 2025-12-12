@@ -485,6 +485,8 @@ impl<T: Ord + Clone + Hash + Debug> Builder<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::hash::{BuildHasherDefault, DefaultHasher};
+
     use super::*;
     use mockall::automock;
 
@@ -1339,14 +1341,13 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "gxhash")]
     fn test_gxhash() {
-        let gxhash_builder = gxhash::GxBuildHasher::default();
+        let build_hasher = BuildHasherDefault::<DefaultHasher>::default();
         let k = 2;
         let width = 100;
         let depth = 5;
         let decay = 0.9;
-        let mut topk: TopK<Vec<u8>, _> = TopK::with_hasher(k, width, depth, decay, gxhash_builder);
+        let mut topk: TopK<Vec<u8>, _> = TopK::with_hasher(k, width, depth, decay, build_hasher);
 
         let items = [
             b"item1".to_vec(),
