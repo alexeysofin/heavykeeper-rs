@@ -6,7 +6,7 @@ use std::hash::{Hash, BuildHasher};
 use rand::{SeedableRng, RngCore};
 use rand::rngs::SmallRng;
 use thiserror::Error;
-use crate::priority_queue::TopKQueue;
+use crate::priority_queue::{TopKQueue, TopKQueueChanges, TopKQueueChange};
 use crate::hash_composition::HashComposer;
 
 #[cfg(feature = "serde")]
@@ -235,7 +235,7 @@ impl<T: Ord + Clone + Hash + Debug, H: BuildHasher + Clone + Default> TopK<T, H>
         }
     }
 
-    pub fn add<Q>(&mut self, item: &Q, increment: u64)
+    pub fn add<Q>(&mut self, item: &Q, increment: u64) -> TopKQueueChanges<T>
     where
         T: Borrow<Q>,
         Q: Hash + Eq + ToOwned<Owned = T> + ?Sized,
@@ -294,12 +294,12 @@ impl<T: Ord + Clone + Hash + Debug, H: BuildHasher + Clone + Default> TopK<T, H>
         if self.priority_queue.is_full() {
             // Only check min_count if queue is full
             if max_count < self.priority_queue.min_count() {
-                return;
+                return TopKQueueChanges{changes: vec![]};
             }
         }
 
         // Clone the item here since we need to store it in the priority queue
-        self.priority_queue.upsert(item.to_owned(), max_count);
+        self.priority_queue.upsert(item.to_owned(), max_count)
     }
 
     pub fn list(&self) -> Vec<Node<T>> {
@@ -647,6 +647,27 @@ mod tests {
         assert_eq!(nodes.len(), 1, "Should have exactly one item");
         assert_eq!(nodes[0].count, 1, "Count should be 1");
         assert_eq!(nodes[0].item, item, "Item should match");
+    }
+
+    /// Tests topk queue changes
+    #[test]
+    fn test_changes() {
+        let k = 1;
+        let width = 100;
+        let depth = 5;
+        let decay = 0.9;
+        let mut topk: TopK<Vec<u8>> = TopK::new(k, width, depth, decay);
+
+        let item = b"hello".to_vec();
+        let changes = topk.add(&item, 1);
+
+        assert_eq!(changes.changes.len(), 1, "must have 1 change");
+        assert_eq!(changes.changes, vec![TopKQueueChange::Set(b"hello".to_vec(), 1)]);
+
+        let changes = topk.add(&b"hello2".to_vec(), 10);
+        assert_eq!(changes.changes.len(), 2, "must have 2 changes");
+        assert_eq!(changes.changes, vec![TopKQueueChange::Set(b"hello2".to_vec(), 10), TopKQueueChange::Remove(b"hello".to_vec())]);
+        
     }
 
     /// Tests adding a an item and overwriting it with another

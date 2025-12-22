@@ -21,6 +21,18 @@ pub(crate) struct TopKQueue<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + 
     sequence: usize,
 }
 
+
+#[derive(Debug, PartialEq)]
+pub enum TopKQueueChange<T: Ord + Clone + Hash + PartialEq> {
+    Set(T, u64),
+    Remove(T)
+}
+
+#[derive(Debug, PartialEq)]
+pub struct TopKQueueChanges<T: Ord + Clone + Hash + PartialEq> {
+    pub changes: Vec<TopKQueueChange<T>>
+}
+
 impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T, RandomState> {
     #[allow(dead_code)]
     pub(crate) fn with_capacity(capacity: usize) -> Self {
@@ -70,10 +82,10 @@ impl<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone + Default> TopKQu
         self.items.len() >= self.capacity
     }
 
-    pub(crate) fn upsert(&mut self, item: T, count: u64) {
+    pub(crate) fn upsert(&mut self, item: T, count: u64) -> TopKQueueChanges<T> {
         // Fast path: update existing item
         if let Some((old_count, pos)) = self.items.get_mut(&item) {
-            if count == *old_count { return; }
+            if count == *old_count { return TopKQueueChanges{changes: vec![]}; }
             *old_count = count;
             
             // Update heap - no need to clone item
@@ -82,7 +94,7 @@ impl<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone + Default> TopKQu
             self.heap[pos] = (count, self.heap[pos].1, item_idx);
             self.sift_down(pos);
             self.sift_up(pos);
-            return;
+            return TopKQueueChanges{changes: vec![TopKQueueChange::Set(item, count)]};
         }
 
         // For new items, if we have space just add it
@@ -100,25 +112,29 @@ impl<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone + Default> TopKQu
             };
             
             self.heap.push((count, self.sequence, item_idx));
-            self.items.insert(item, (count, pos));
+            self.items.insert(item.clone(), (count, pos));
             self.sift_up(pos);
-            return;
+            return TopKQueueChanges{changes: vec![TopKQueueChange::Set(item, count)]};
         }
 
         // Queue is full - check if new count beats minimum
         if let Some(&(min_count, _, item_idx)) = self.heap.first() {
             if count > min_count {
-                let old_item = &self.item_store[item_idx];
-                self.items.remove(old_item);
-                
                 // Reuse the item slot
-                self.item_store[item_idx] = item.clone();
-                self.items.insert(item, (count, 0));
+                let old_item = std::mem::replace(&mut self.item_store[item_idx], item.clone());
+                self.items.remove(&old_item);
+
+                self.items.insert(item.clone(), (count, 0));
                 self.sequence += 1;
                 self.heap[0] = (count, self.sequence, item_idx);
                 self.sift_down(0);
+
+                return TopKQueueChanges{
+                    changes: vec![TopKQueueChange::Set(item, count), TopKQueueChange::Remove(old_item)]}
             }
         }
+
+        TopKQueueChanges{changes: vec![]}
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (&T, u64)> {
