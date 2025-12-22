@@ -7,6 +7,7 @@
 
 mod heavykeeper;
 pub use heavykeeper::TopK;
+pub use priority_queue::{TopKQueueChanges, TopKQueueChange};
 
 mod priority_queue;
 mod hash_composition;
