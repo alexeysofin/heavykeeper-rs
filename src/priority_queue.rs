@@ -22,12 +22,20 @@ pub(crate) struct TopKQueue<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + 
 }
 
 
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize)
+)]
 #[derive(Debug, PartialEq)]
 pub enum TopKQueueChange<T: Ord + Clone + Hash + PartialEq> {
     Set(T, u64),
     Remove(T)
 }
 
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize)
+)]
 #[derive(Debug, PartialEq)]
 pub struct TopKQueueChanges<T: Ord + Clone + Hash + PartialEq> {
     pub changes: Vec<TopKQueueChange<T>>
