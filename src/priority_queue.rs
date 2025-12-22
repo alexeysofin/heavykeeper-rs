@@ -28,7 +28,7 @@ pub(crate) struct TopKQueue<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + 
 )]
 #[derive(Debug, PartialEq)]
 pub enum TopKQueueChange<T: Ord + Clone + Hash + PartialEq> {
-    Set(T, u64),
+    Set(T, u64, u64),
     Remove(T)
 }
 
@@ -94,7 +94,7 @@ impl<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone + Default> TopKQu
         // Fast path: update existing item
         if let Some((old_count, pos)) = self.items.get_mut(&item) {
             if count == *old_count { return TopKQueueChanges{changes: vec![]}; }
-            *old_count = count;
+            let old_count = std::mem::replace(old_count, count);
             
             // Update heap - no need to clone item
             let pos = *pos;
@@ -102,7 +102,7 @@ impl<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone + Default> TopKQu
             self.heap[pos] = (count, self.heap[pos].1, item_idx);
             self.sift_down(pos);
             self.sift_up(pos);
-            return TopKQueueChanges{changes: vec![TopKQueueChange::Set(item, count)]};
+            return TopKQueueChanges{changes: vec![TopKQueueChange::Set(item, count, old_count)]};
         }
 
         // For new items, if we have space just add it
@@ -122,7 +122,7 @@ impl<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone + Default> TopKQu
             self.heap.push((count, self.sequence, item_idx));
             self.items.insert(item.clone(), (count, pos));
             self.sift_up(pos);
-            return TopKQueueChanges{changes: vec![TopKQueueChange::Set(item, count)]};
+            return TopKQueueChanges{changes: vec![TopKQueueChange::Set(item, count, 0)]};
         }
 
         // Queue is full - check if new count beats minimum
@@ -138,7 +138,7 @@ impl<T: Ord + Clone + Hash + PartialEq, H: BuildHasher + Clone + Default> TopKQu
                 self.sift_down(0);
 
                 return TopKQueueChanges{
-                    changes: vec![TopKQueueChange::Set(item, count), TopKQueueChange::Remove(old_item)]}
+                    changes: vec![TopKQueueChange::Set(item, count, 0), TopKQueueChange::Remove(old_item)]}
             }
         }
 

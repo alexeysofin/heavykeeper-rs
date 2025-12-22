@@ -662,11 +662,15 @@ mod tests {
         let changes = topk.add(&item, 1);
 
         assert_eq!(changes.changes.len(), 1, "must have 1 change");
-        assert_eq!(changes.changes, vec![TopKQueueChange::Set(b"hello".to_vec(), 1)]);
+        assert_eq!(changes.changes, vec![TopKQueueChange::Set(b"hello".to_vec(), 1, 0)]);
 
-        let changes = topk.add(&b"hello2".to_vec(), 10);
+        let changes = topk.add(&item, 10);
+        assert_eq!(changes.changes.len(), 1, "must have 1 change");
+        assert_eq!(changes.changes, vec![TopKQueueChange::Set(b"hello".to_vec(), 11, 1)]);
+
+        let changes = topk.add(&b"hello2".to_vec(), 100);
         assert_eq!(changes.changes.len(), 2, "must have 2 changes");
-        assert_eq!(changes.changes, vec![TopKQueueChange::Set(b"hello2".to_vec(), 10), TopKQueueChange::Remove(b"hello".to_vec())]);
+        assert_eq!(changes.changes, vec![TopKQueueChange::Set(b"hello2".to_vec(), 100, 0), TopKQueueChange::Remove(b"hello".to_vec())]);
         
     }
 
